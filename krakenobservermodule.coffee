@@ -109,12 +109,14 @@ digestCurrentData = ->
 ############################################################
 digestRelevantBalances = ->
     for asset in usedAssets
-        balance = latestBalances[asset.krakenName]
+        if !latestBalances? then balance = "0"
+        else balance = latestBalances[asset.krakenName]
         if !balance? then balance = "0"
         data.setAssetBalance(asset.ourName, parseFloat(balance))
     return
 
 digestRelevantOrders = ->
+    # olog latestOrders
     for pair in usedAssetPairs
         buyOrders = getBuyOrdersFor(pair)
         sellOrders = getSellOrdersFor(pair)
