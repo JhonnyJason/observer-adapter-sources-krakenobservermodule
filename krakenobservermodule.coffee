@@ -74,6 +74,7 @@ getLatestBalance = ->
     try
         response = await kraken.api('Balance')
         latestBalances = response.result
+        print ostr latestBalances
     catch err
         log "Error on getLatestBalance"
         log err   
