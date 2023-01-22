@@ -1,12 +1,7 @@
-krakenobservermodule = {name: "krakenobservermodule"}
 ############################################################
-#region printLogFunctions
-log = (arg) ->
-    if allModules.debugmodule.modulesToDebug["krakenobservermodule"]?  then console.log "[krakenobservermodule]: " + arg
-    return
-ostr = (obj) -> JSON.stringify(obj, null, 4)
-olog = (obj) -> log "\n" + ostr(obj)
-print = (arg) -> console.log(arg)
+#region debug
+import { createLogFunctions } from "thingy-debug"
+{log, olog} = createLogFunctions("krakenobservermodule")
 #endregion
 
 ############################################################
@@ -34,8 +29,8 @@ latestTicker = null
 #endregion
 
 ############################################################
-krakenobservermodule.initialize = () ->
-    log "krakenobservermodule.initialize"
+export initialize = () ->
+    log "initialize"
     data = allModules.datahandlermodule
     c = allModules.configmodule
     
@@ -204,13 +199,11 @@ getAllAssetPairs = ->
 #endregion
 
 ############################################################
-krakenobservermodule.startObservation = ->
-    log "krakenobservermodule.startObservation"
+export startObservation = ->
+    log "startObservation"
     # getAllAssetPairs()
     heartbeat()
     heartBeatTimerId = setInterval(heartbeat, heartbeatMS)
     return
 
 #endregion
-
-module.exports = krakenobservermodule
