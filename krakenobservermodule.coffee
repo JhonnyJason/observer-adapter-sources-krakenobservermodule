@@ -5,12 +5,18 @@ import { createLogFunctions } from "thingy-debug"
 #endregion
 
 ############################################################
-KrakenClient = require('kraken-api')
-data = null
+import KrakenClient from "kraken-api"
+import WebSocket from "ws"
+
+############################################################
+import * as data from "./datahandlermodule.js"
+import * as krakenTranslation from "./krakentranslationmodule.js"
 
 ############################################################
 #region internalProperties
 kraken = null
+krakenSocket = null
+wsToken = ""
 
 ############################################################
 heartbeatMS = 0
@@ -29,21 +35,104 @@ latestTicker = null
 #endregion
 
 ############################################################
-export initialize = () ->
+export initialize = ->
     log "initialize"
-    data = allModules.datahandlermodule
     c = allModules.configmodule
     
-    kraken       = new KrakenClient(c.apiKey, c.secret)
+    ## TODO get the secrets from somwhere else - remove from config
+    kraken = new KrakenClient(c.apiKey, c.secret)
     
     heartbeatMS = c.observerHeartbeatM * 60 * 1000
 
-    usedAssetPairs = allModules.krakentranslationmodule.relevantAssetPairs
-    usedAssets = allModules.krakentranslationmodule.relevantAssets
+    usedAssetPairs = krakenTranslation.relevantAssetPairs
+    usedAssets = krakenTranslation.relevantAssets
     return
 
 ############################################################
 #region internalFunctions
+getWebsocketToken = ->
+    try
+        res = await kraken.api("GetWebSocketsToken")
+        
+        if res.error and res.error.length > 0 
+            errMessage = "Response contained errors!\n"
+            errMessage += res.error.join(", ")
+            new Error(errMessage)
+        
+        return res.result.token
+    catch err
+        errMessage = "Request GetWebSocketsToken failed!\n"
+        errMessage += err.message
+        throw new Error(errMessage)
+    return
+
+connectWS = ->
+    wsToken = await getWebsocketToken()
+    krakenSocket = new WebSocket("wss://ws-auth.kraken.com")
+    krakenSocket.on('open', socketOpened)
+    krakenSocket.on('message', socketMesssageReceived)
+
+    return
+
+socketOpened = (data) ->
+    log "socketOpened"
+    olog { data }
+
+    ## TODO testing
+    # pairs = usedAssetPairs.map( (el) -> el.krakenName )
+    # subscribeToTicker(pairs)
+
+    subscribeToOwnTrades()
+    return
+
+socketMesssageReceived = (data) ->
+    log "socketMesssageReceived"
+    try
+        data = JSON.parse(data.toString())
+        olog {data}
+    catch err then log "parsing Kraken Message went wrong! "+err.message
+
+    return
+
+socketClosed = (reason) ->
+    log "socketClosed"
+    olog {reason}
+    return
+
+
+sendWSData = (data) ->
+    message = JSON.stringify(data)
+    krakenSocket.send(message)
+    return
+
+
+subscribeToTicker = (pairs) ->
+    log "subscribeToTicker"
+    name = "ticker"
+
+    ## Build Message Data Object
+    data = {
+        event: "subscribe"
+        pair: pairs
+        subscription: { name }
+    }
+
+    sendWSData(data)
+    return
+
+subscribeToOwnTrades = ->
+    log "subscribeToOwnTrades"
+    name = "ownTrades"
+    token = wsToken
+
+    ## Build Message Data Object
+    data = {
+        event: "subscribe"
+        subscription: { name, token }
+    }
+
+    sendWSData(data)
+    return
 heartbeat = ->
     log " > heartbeat"
     await getLatestBalance()
@@ -201,9 +290,10 @@ getAllAssetPairs = ->
 ############################################################
 export startObservation = ->
     log "startObservation"
+    connectWS()
     # getAllAssetPairs()
-    heartbeat()
-    heartBeatTimerId = setInterval(heartbeat, heartbeatMS)
+    # heartbeat()
+    # heartBeatTimerId = setInterval(heartbeat, heartbeatMS)
     return
 
 #endregion
